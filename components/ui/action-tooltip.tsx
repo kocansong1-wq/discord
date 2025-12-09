@@ -12,6 +12,8 @@ interface ActionTooltipProps {
 }
 
 export const ActionTooltip = ({children, label, side, align}:ActionTooltipProps) =>{
+    if (!label) return <>{children}</>;
+    
     return (
         <TooltipProvider>
             <Tooltip delayDuration={50} >

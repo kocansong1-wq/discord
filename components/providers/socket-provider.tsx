@@ -25,44 +25,40 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [latency, setLatency] = useState<number | null>(null);
 
   useEffect(() => {
+    // Sử dụng polling trước, sau đó upgrade lên websocket
+    // Điều này giúp tránh lỗi WebSocket trong Next.js dev mode
     const socketInstance = ClientIO(process.env.NEXT_PUBLIC_BASE_URL!, {
       path: "/api/socket/io",
       addTrailingSlash: false,
-      // Cải thiện reconnection
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      // Transports
-      transports: ["websocket", "polling"],
+      // Polling first, then upgrade to websocket
+      transports: ["polling", "websocket"],
+      upgrade: true,
     });
 
     socketInstance.on("connect", () => {
-      console.log("[Socket] Connected:", socketInstance.id);
       setIsConnected(true);
     });
 
-    socketInstance.on("disconnect", (reason) => {
-      console.log("[Socket] Disconnected:", reason);
+    socketInstance.on("disconnect", () => {
       setIsConnected(false);
     });
 
-    socketInstance.on("connect_error", (error) => {
-      console.log("[Socket] Connection error:", error.message);
-      // Fallback to polling if websocket fails
-      if (socketInstance.io.opts.transports?.includes("websocket")) {
-        socketInstance.io.opts.transports = ["polling", "websocket"];
-      }
+    socketInstance.on("connect_error", () => {
+      // Silent error handling
     });
 
-    socketInstance.on("reconnect", (attemptNumber) => {
-      console.log("[Socket] Reconnected after", attemptNumber, "attempts");
+    socketInstance.on("reconnect", () => {
+      // Reconnected
     });
 
     setSocket(socketInstance);
 
-    // Ping check interval
+    // Ping check interval - less frequent
     const interval = setInterval(() => {
       if (socketInstance.connected) {
         const start = Date.now();
@@ -71,7 +67,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
           setLatency(duration);
         });
       }
-    }, 3000);
+    }, 5000);
 
     return () => {
       clearInterval(interval);

@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hash, Mic, ShieldAlert, ShieldCheck, Video } from "lucide-react";
 import { ServerSection } from "./server-section";
 import { ServerChannel } from "./server-channel";
+import { ServerVoiceInit } from "./server-voice-init";
 interface ServerSidebarProps {
     serverId: string;
 }
@@ -60,6 +61,7 @@ export const ServerSidebar = async ({ serverId }: ServerSidebarProps) => {
 
     return (
         <div className="h-full text-primary w-full dark:bg-[#2B2D31] bg-[#F2F3F5]">
+            <ServerVoiceInit serverId={serverId} />
             <ServerHeader server={server} role={role} />
             <ScrollArea className="flex-1 px-3 mt-3">
                 {!!textChannels?.length && (

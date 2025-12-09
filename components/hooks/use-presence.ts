@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 
 type UserStatus = "ONLINE" | "IDLE" | "DND" | "OFFLINE";
@@ -9,27 +9,40 @@ export const usePresence = () => {
   const statusRef = useRef<UserStatus>("OFFLINE");
   const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
+  const lastApiCallRef = useRef<number>(0);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const updateStatus = async (status: UserStatus) => {
+  const updateStatus = useCallback(async (status: UserStatus) => {
     if (statusRef.current === status) return;
     
+    // Throttle API calls - minimum 10 seconds between calls
+    const now = Date.now();
+    if (now - lastApiCallRef.current < 10000) return;
+    
     try {
+      lastApiCallRef.current = now;
       await axios.patch("/api/users/status", { status });
       statusRef.current = status;
     } catch (error) {
       console.error("[Presence] Failed to update status:", error);
     }
-  };
+  }, []);
 
-  const resetIdleTimer = () => {
+  const resetIdleTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
-    
-    if (statusRef.current === "IDLE") {
-      updateStatus("ONLINE");
-    }
 
     if (idleTimeoutRef.current) {
       clearTimeout(idleTimeoutRef.current);
+    }
+
+    // Debounce the ONLINE status update
+    if (statusRef.current === "IDLE") {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      debounceRef.current = setTimeout(() => {
+        updateStatus("ONLINE");
+      }, 1000); // Wait 1 second before updating to ONLINE
     }
 
     // Set idle after 5 minutes of inactivity
@@ -38,16 +51,21 @@ export const usePresence = () => {
         updateStatus("IDLE");
       }
     }, 5 * 60 * 1000); // 5 minutes
-  };
+  }, [updateStatus]);
 
   useEffect(() => {
     // Set online when component mounts
     updateStatus("ONLINE");
 
-    // Track user activity
-    const events = ["mousedown", "keydown", "scroll", "touchstart", "mousemove"];
+    // Track user activity - only essential events
+    const events = ["mousedown", "keydown", "touchstart"];
     
+    // Throttled activity handler
+    let lastEventTime = 0;
     const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastEventTime < 5000) return; // Throttle to once per 5 seconds
+      lastEventTime = now;
       resetIdleTimer();
     };
 
@@ -69,7 +87,6 @@ export const usePresence = () => {
 
     // Handle before unload (closing tab/browser)
     const handleBeforeUnload = () => {
-      // Use sendBeacon for reliable delivery
       navigator.sendBeacon(
         "/api/users/status",
         JSON.stringify({ status: "OFFLINE" })
@@ -81,7 +98,7 @@ export const usePresence = () => {
     // Initial idle timer
     resetIdleTimer();
 
-    // Heartbeat to keep status updated
+    // Heartbeat - check every 2 minutes instead of 1
     const heartbeat = setInterval(() => {
       if (statusRef.current !== "OFFLINE" && statusRef.current !== "DND") {
         const timeSinceActivity = Date.now() - lastActivityRef.current;
@@ -89,7 +106,7 @@ export const usePresence = () => {
           updateStatus("IDLE");
         }
       }
-    }, 60 * 1000); // Check every minute
+    }, 2 * 60 * 1000); // Check every 2 minutes
 
     return () => {
       events.forEach((event) => {
@@ -98,15 +115,13 @@ export const usePresence = () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       
-      if (idleTimeoutRef.current) {
-        clearTimeout(idleTimeoutRef.current);
-      }
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       clearInterval(heartbeat);
       
-      // Set offline when unmounting
       updateStatus("OFFLINE");
     };
-  }, []);
+  }, [updateStatus, resetIdleTimer]);
 
   return { updateStatus };
 };

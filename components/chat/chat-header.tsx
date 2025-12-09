@@ -10,7 +10,7 @@ import { currentProfile } from "@/lib/current-profile";
 import { redirect } from "next/navigation";
 import { ModeToggle } from "@/components/mode-toggle";
 interface ChatHeaderProps {
-    serverId: string,
+    serverId?: string,
     name: string,
     type: "channel" | "conversation";
     imgUrl?: string,
@@ -34,7 +34,9 @@ export const ChatHeader = async ({ serverId, name, type, imgUrl }: ChatHeaderPro
     if (!profile) {
         return redirect("/"); 
     }
-    const server = await db.server.findUnique({
+    
+    // Only fetch server data if serverId is provided
+    const server = serverId ? await db.server.findUnique({
         where: {
             id: serverId,
         },
@@ -53,14 +55,15 @@ export const ChatHeader = async ({ serverId, name, type, imgUrl }: ChatHeaderPro
                 }
             },
         }
-    });
+    }) : null;
+    
     const textChannels = server?.channels.filter((channel) => channel.type === ChannelType.TEXT);
     const audioChannels = server?.channels.filter((channel) => channel.type === ChannelType.AUDIO);
     const videoChannels = server?.channels.filter((channel) => channel.type === ChannelType.VIDEO);
     const members = server?.members.filter((member) => member.profileId !== profile.id);
     return (
         <div className="text-md font-semibold px-2 flex items-center h-12 border-neutral-200 dark:border-neutral-800 border-b-2">
-            <MobileToggle serverId={serverId} />
+            {serverId && <MobileToggle serverId={serverId} />}
             {type === "channel" && (
                 <Hash className="w-5 h-5 text-zinc-500 dark:text-zinc-500 mr-2 " />
             )}
@@ -76,52 +79,53 @@ export const ChatHeader = async ({ serverId, name, type, imgUrl }: ChatHeaderPro
                 <ModeToggle />
                 <SocketIndicator />
 
-                <div className="w-53 absolute right-4">
-                    <ServerSearch data={[{
-                        label: "Text Channels",
-                        type: "channel",
-                        data:
-                            textChannels?.map((channel) => ({
-                                id: channel.id,
-                                name: channel.name,
-                                icon: iconMap[channel.type],
-                            })),
+                {server && (
+                    <div className="w-53 absolute right-4">
+                        <ServerSearch data={[{
+                            label: "Text Channels",
+                            type: "channel",
+                            data:
+                                textChannels?.map((channel) => ({
+                                    id: channel.id,
+                                    name: channel.name,
+                                    icon: iconMap[channel.type],
+                                })),
 
-                    },
-                    {
-                        label: "Voice Channels",
-                        type: "channel",
-                        data:
-                            audioChannels?.map((channel) => ({
-                                id: channel.id,
-                                name: channel.name,
-                                icon: iconMap[channel.type],
-                            }))
-                    },
-                    {
-                        label: "Video Channels",
-                        type: "channel",
-                        data:
-                            videoChannels?.map((channel) => ({
-                                id: channel.id,
-                                name: channel.name,
-                                icon: iconMap[channel.type],
-                            }))
-                    }, {
-                        label: "Members",
-                        type: "member",
-                        data:
-                            members?.map((members) => ({
-                                id: members.id,
-                                name: profile.name,
-                                icon: roleIconMap[members.role],
-                            }))
-                    }
+                        },
+                        {
+                            label: "Voice Channels",
+                            type: "channel",
+                            data:
+                                audioChannels?.map((channel) => ({
+                                    id: channel.id,
+                                    name: channel.name,
+                                    icon: iconMap[channel.type],
+                                }))
+                        },
+                        {
+                            label: "Video Channels",
+                            type: "channel",
+                            data:
+                                videoChannels?.map((channel) => ({
+                                    id: channel.id,
+                                    name: channel.name,
+                                    icon: iconMap[channel.type],
+                                }))
+                        }, {
+                            label: "Members",
+                            type: "member",
+                            data:
+                                members?.map((members) => ({
+                                    id: members.id,
+                                    name: profile.name,
+                                    icon: roleIconMap[members.role],
+                                }))
+                        }
 
-                    ]}
-                    />
-
-                </div>
+                        ]}
+                        />
+                    </div>
+                )}
 
             </div>
         </div>

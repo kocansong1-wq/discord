@@ -41,8 +41,8 @@ const ServerIdLayout = async ({
       <div className="hidden md:flex h-full w-60 z-20 flex-col fixed inset-y-0">
         <ServerSidebar serverId={serverId} />
       </div>
-      <main className="h-full md:pl-60">{children}</main>
-      <div className="hidden md:flex h-full w-60 flex-col fixed inset-y-0 right-0 border-l-1 my-12">
+      <main className="h-full md:pl-60 md:pr-60">{children}</main>
+      <div className="hidden md:flex h-full w-60 flex-col fixed inset-y-0 right-0 border-l border-zinc-200 dark:border-zinc-700 mt-12 z-10">
         <Suspense fallback={<RightSidebarSkeleton />}>
           <ShowMemberChannel serverId={serverId} />
         </Suspense>

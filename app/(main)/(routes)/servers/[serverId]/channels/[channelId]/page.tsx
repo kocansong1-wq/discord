@@ -31,6 +31,8 @@ export default async function ChannelIdPage(props: ChannelIdPageProps) {
 
   if (!channel || !member) return redirect("/");
 
+  const isVoiceChannel = channel.type === ChannelType.AUDIO || channel.type === ChannelType.VIDEO;
+
   return (
     <div className="bg-white dark:bg-[#313338] flex flex-col h-full">
       <ChatHeader
@@ -66,10 +68,24 @@ export default async function ChannelIdPage(props: ChannelIdPageProps) {
         </>
       )}
       {channel.type === ChannelType.AUDIO && (
-        <MediaRoom chatId={channel.id} video={false} audio={true} />
+        <MediaRoom 
+          chatId={channel.id} 
+          video={false} 
+          audio={true}
+          profileId={profile.id}
+          profileName={profile.name}
+          profileImageUrl={profile.imageUrl}
+        />
       )}
       {channel.type === ChannelType.VIDEO && (
-        <MediaRoom chatId={channel.id} video={true} audio={true} />
+        <MediaRoom 
+          chatId={channel.id} 
+          video={true} 
+          audio={true}
+          profileId={profile.id}
+          profileName={profile.name}
+          profileImageUrl={profile.imageUrl}
+        />
       )}
     </div>
   );

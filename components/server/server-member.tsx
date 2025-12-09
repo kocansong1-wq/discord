@@ -25,7 +25,8 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
     const icon = roleIconMap[member.role];
 
     const onClick = () => {
-        router.push(`/servers/${params?.serverId}/conversations/${member.id}`)
+        // Redirect to global DM based on profileId
+        router.push(`/dm/${member.profile.id}`)
     }
 
     return (

@@ -68,6 +68,11 @@ model Profile{
   members Member[]
   channels Channel[]
 
+  // Global DM relations
+  conversationsInitiated GlobalConversation[] @relation("ProfileOne")
+  conversationsReceived GlobalConversation[] @relation("ProfileTwo")
+  globalDirectMessages GlobalDirectMessage[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -170,6 +175,47 @@ model Message {
   @@index([memberId])
 }
 
+// Global Conversation - dựa trên Profile thay vì Member
+model GlobalConversation {
+  id String @id @default(uuid())
+  
+  profileOneId String 
+  profileOne Profile @relation("ProfileOne", fields: [profileOneId], references: [id], onDelete: Cascade)
+
+  profileTwoId String 
+  profileTwo Profile @relation("ProfileTwo", fields: [profileTwoId], references: [id], onDelete: Cascade)
+
+  directMessages GlobalDirectMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([profileOneId, profileTwoId])
+  @@index([profileOneId])
+  @@index([profileTwoId])
+}
+
+model GlobalDirectMessage {
+  id String @id @default(uuid())
+  content String @db.Text
+  fileUrl String? @db.Text
+
+  profileId String
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation GlobalConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  deleted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([conversationId])
+}
+
+// Legacy - giữ lại cho backward compatibility
 model Conversation {
   id String @id @default(uuid())
   memberOneId String 
@@ -181,9 +227,7 @@ model Conversation {
   directMessages DirectMessage[]
 
   @@index([memberTwoId])
-
   @@unique([memberOneId, memberTwoId])
-
 }
 
 model DirectMessage {
@@ -195,7 +239,7 @@ model DirectMessage {
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   conversationId String
-  conversation Conversation @relation (fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

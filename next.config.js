@@ -51,6 +51,11 @@ const nextConfig = {
     // Cache images lâu hơn
     minimumCacheTTL: 60 * 60 * 24, // 24 hours
   },
+  logging: {
+  fetches: {
+    fullUrl: false,
+  },
+},
 
   // Tối ưu headers
   poweredByHeader: false,

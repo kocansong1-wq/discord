@@ -6,25 +6,19 @@ import { Crown, Shield, DiamondPlus, Moon, MinusCircle } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { UserAvatar } from "../ui/user-avatar";
 
-// Status enum - sau khi chạy prisma generate có thể import từ @/lib/generated/prisma
 type UserStatus = "ONLINE" | "IDLE" | "DND" | "OFFLINE";
 
-// Extended profile type với status
-interface ProfileWithStatus {
+// Simplified profile type - only fields we actually use
+interface ProfileData {
   id: string;
   name: string;
   imageUrl: string;
-  email: string;
-  userId: string;
   isPremium: boolean;
   status?: UserStatus;
-  lastSeen?: Date;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 interface MemberItemProps {
-  member: Member & { profile: ProfileWithStatus };
+  member: Member & { profile: ProfileData };
   server: Server;
   roleType: MemberRole;
 }
@@ -69,7 +63,8 @@ export const MemberItem = ({ member }: MemberItemProps) => {
   const StatusIcon = statusInfo.icon;
 
   const onClick = () => {
-    router.push(`/servers/${params?.serverId}/conversations/${member.id}`);
+    // Redirect to global DM based on profileId instead of memberId
+    router.push(`/dm/${member.profile.id}`);
   };
 
   return (

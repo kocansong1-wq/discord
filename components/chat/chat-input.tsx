@@ -8,7 +8,6 @@ import qs from "query-string";
 import axios from "axios";
 import { useModal } from "../hooks/user-model-store";
 import { EmojiPicker } from "../emoji-picker";
-import { useRouter } from "next/navigation";
 import { Gift, Plus } from "lucide-react";
 
 interface ChatInputProps {
@@ -22,24 +21,25 @@ const formSchema = z.object({
   content: z.string().min(1),
 });
 
-const PERSPECTIVE_API_KEY = process.env.NEXT_PUBLIC_PERSPECTIVE_API_KEY; // lưu trong .env.local
+const PERSPECTIVE_API_KEY = process.env.NEXT_PUBLIC_PERSPECTIVE_API_KEY;
 
-const checkToxic = async (text: string) => {
+// Check toxic in background - không block gửi tin nhắn
+const checkToxicAsync = async (text: string): Promise<{ toxicity: number; spam: number }> => {
   try {
     const response = await axios.post(
       `https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze?key=${PERSPECTIVE_API_KEY}`,
       {
         comment: { text },
-        languages: ["en"],
+        languages: ["en", "vi"],
         requestedAttributes: {
           TOXICITY: {},
           SPAM: {},
         },
-      }
+      },
+      { timeout: 3000 } // Timeout 3s
     );
 
-    const toxicity =
-      response.data.attributeScores?.TOXICITY?.summaryScore?.value || 0;
+    const toxicity = response.data.attributeScores?.TOXICITY?.summaryScore?.value || 0;
     const spam = response.data.attributeScores?.SPAM?.summaryScore?.value || 0;
 
     return { toxicity, spam };
@@ -51,7 +51,6 @@ const checkToxic = async (text: string) => {
 
 export const ChatInput = ({ apiUrl, query, name, type }: ChatInputProps) => {
   const { onOpen } = useModal();
-  const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -63,63 +62,63 @@ export const ChatInput = ({ apiUrl, query, name, type }: ChatInputProps) => {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      const { toxicity, spam } = await checkToxic(values.content);
-
-      if (toxicity > 0.7) {
-        alert("🚫 Tin nhắn có nội dung độc hại, không thể gửi.");
-        return;
-      }
-
-      if (spam > 0.7) {
-        alert("🚫 Tin nhắn bị phát hiện là spam, không thể gửi.");
-        return;
-      }
-
+      // Gửi tin nhắn ngay lập tức - socket sẽ update UI
       const url = qs.stringifyUrl({
         url: apiUrl,
         query,
       });
-      await axios.post(url, values);
+      
+      // Reset form ngay để UX tốt hơn
       form.reset();
-      router.refresh();
+      
+      // Gửi tin nhắn
+      await axios.post(url, values);
+      
+      // Check toxic trong background (không block)
+      checkToxicAsync(values.content).then(({ toxicity, spam }) => {
+        if (toxicity > 0.7 || spam > 0.7) {
+          console.warn("Toxic/spam message detected:", { toxicity, spam });
+          // Có thể implement: xóa tin nhắn hoặc flag nó
+        }
+      });
     } catch (err) {
-      console.log(err);
+      console.error("Failed to send message:", err);
     }
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="w-full">
         <FormField
           control={form.control}
           name="content"
           render={({ field }) => (
             <FormItem>
               <FormControl>
-                <div className="relative p-4 pb-6 w-[85%] ">
+                <div className="relative px-4 pb-6 pt-4">
                   <button
                     type="button"
                     onClick={() => onOpen("messageFile", { apiUrl, query })}
-                    className="absolute top-7 left-8 h-[24px] w-[24px] bg-zinc-500 dark:bg-zinc-400 hover:bg-zinc-600 dark:hover:bg-zinc-300 transition rounded-full p-1 flex items-center justify-center"
+                    className="absolute top-1/2 -translate-y-1/2 left-8 h-6 w-6 bg-zinc-500 dark:bg-zinc-400 hover:bg-zinc-600 dark:hover:bg-zinc-300 transition rounded-full p-1 flex items-center justify-center"
                   >
-                    <Plus className="text-white dark:text-[#313338]" />
+                    <Plus className="text-white dark:text-[#313338] h-4 w-4" />
                   </button>
                   <Input
                     disabled={isLoading}
-                    placeholder={`Text to ${
+                    placeholder={`Message ${
                       type === "conversation" ? name : "#" + name
                     }`}
                     {...field}
-                    className="px-16 py-6 bg-zinc-200/90 dark:bg-zinc-700/75 border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-zinc-600 dark:text-zinc-200 "
+                    className="pl-14 pr-24 py-6 bg-zinc-200/90 dark:bg-zinc-700/75 border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-zinc-600 dark:text-zinc-200"
                   />
-                  <button 
-                    type="button" 
-                    className="absolute top-7 right-19" 
-                    onClick={() => onOpen("payment")}
-                  >
-                    <Gift className="cursor-pointer text-zinc-600 dark:text-zinc-400 hover:text-indigo-500 transition" />
-                  </button>
-                  <div className="absolute top-7 right-8" >
+                  <div className="absolute top-1/2 -translate-y-1/2 right-8 flex items-center gap-2">
+                    <button 
+                      type="button" 
+                      onClick={() => onOpen("payment")}
+                      className="hover:opacity-75 transition"
+                    >
+                      <Gift className="h-5 w-5 text-zinc-500 dark:text-zinc-400 hover:text-indigo-500 transition" />
+                    </button>
                     <EmojiPicker
                       onChange={(emoji: string) =>
                         field.onChange(`${field.value} ${emoji}`)
@@ -130,7 +129,7 @@ export const ChatInput = ({ apiUrl, query, name, type }: ChatInputProps) => {
               </FormControl>
             </FormItem>
           )}
-        ></FormField>
+        />
       </form>
     </Form>
   );
